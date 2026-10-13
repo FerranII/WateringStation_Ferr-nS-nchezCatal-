@@ -1,12 +1,13 @@
 import socket
 import sys
+import threading
 
 HEADER = 64
-PORT = 5050
 FORMAT = 'utf-8'
 FIN = "FIN"
+INIT = "INIT"
 
-def send(msg):
+def send(msg, client):
     message = msg.encode(FORMAT)
     msg_length = len(message)
     send_length = str(msg_length).encode(FORMAT)
@@ -15,29 +16,39 @@ def send(msg):
     client.send(message)
     
 ########## MAIN ##########
-if  (len(sys.argv) == 5):
-    SERVER = sys.argv[1]
-    PORT = int(sys.argv[2])
-    ID_ESTACION = sys.argv[3]
-    UBICACION = sys.argv[4]
-    ADDR = (SERVER, PORT)
+#Monitor: Module that monitors the health of the entire system and reports any fault (leak) to CENTRAL. It is also used to authenticate and register the WS with 
+#the central system when appropriate. 
+#Formato: <PORT_WS> <IP_CENTRAL> <PORT_CENTRAL> <ID_ESTACION> <UBICACION> 
+if  (len(sys.argv) == 6):
+    PORT_WS = int(sys.argv[1])
+    IP_CENTRAL = sys.argv[2]
+    PORT_CENTRAL = int(sys.argv[3])
+    ID_ESTACION = sys.argv[4]
+    UBICACION = sys.argv[5]
     
+    ADDR_CENTRAL = (IP_CENTRAL, PORT_CENTRAL)
+
+    client_central = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    client_central.connect(ADDR_CENTRAL)
+    print (f"Establecida conexión en [{ADDR_CENTRAL}]")
+    
+    """
     client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    client.connect(ADDR)
-    print (f"Establecida conexión en [{ADDR}]")
-    
-    trama = "REGISTRO#"+ID_ESTACION+"#"+UBICACION
-    send(trama)
-    trama_respuesta = client.recv(2048).decode(FORMAT)
-    print("Respuesta entrada del Servidor:", trama_respuesta)
-    msg=sys.argv[3]
-    while msg != FIN :
+    client.connect(ADDR_WS)
+    print (f"Establecida conexión en [{ADDR_WS}]")
+    """
+    tramaRegistro = (f"REGISTRO#{ID_ESTACION}#{UBICACION}")
+    send(tramaRegistro, client_central)
+    msg = input()
+    repuestaEsperada = "STATUS#OK#Estacion registrada correctamente"
+    while msg != FIN and msg != repuestaEsperada:
         print("Envio al servidor: ", msg)
-        send(msg)
-        print("Recibo del Servidor: ", client.recv(2048).decode(FORMAT))
+        send(msg, client_central)
+        print("Recibo del Servidor: ", client_central.recv(2048).decode(FORMAT))
         msg=input()
-    print("Cierro conexión")
-    send(FIN)
-    client.close()
+
+    print ("Envio FIN y cierro la conexión con la central")
+    send(FIN, client_central)
+    client_central.close()
 else:
-    print ("Oops!. Parece que algo falló. Necesito estos argumentos: <ServerIP> <Puerto> <Estacion> <Ubicacion>")
+    print ("Oops!. Parece que algo falló. Necesito estos argumentos: <PORT_WS> <IP_CENTRAL> <PORT_CENTRAL> <ID_ESTACION> <UBICACION> ")

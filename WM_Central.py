@@ -9,7 +9,7 @@ SERVER = socket.gethostbyname(socket.gethostname())
 ADDR = (SERVER, PORT)
 FORMAT = 'utf-8'
 FIN = "FIN"
-MAX_CONEXIONES = 2
+MAX_CONEXIONES = 25
 
 def handle_client(conn, addr):
     print(f"[NUEVA CONEXION] {addr} connected.")
@@ -39,11 +39,7 @@ def handle_client(conn, addr):
     print("ADIOS. TE ESPERO EN OTRA OCASION")
     conn.close()
     
-def change_state(new_state):
-    CURRENT_STATE = new_state
-    print(f"[ESTADO ACTUAL] {CURRENT_STATE}")
 def start():
-    
     server.listen()
     print(f"[LISTENING] Servidor a la escucha en {SERVER}")
     CONEX_ACTIVAS = threading.active_count()-1
@@ -73,4 +69,3 @@ server.bind(ADDR)
 print("[STARTING] Servidor inicializándose...")
 
 start()
-

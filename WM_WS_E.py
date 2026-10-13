@@ -1,37 +1,67 @@
 import socket
 import sys
+import threading
 
 HEADER = 64
-PORT = 5050
 FORMAT = 'utf-8'
 FIN = "FIN"
+INIT = "INIT"
+MAX_ACTIVAS = 10
 
-def send(msg):
-    message = msg.encode(FORMAT)
-    msg_length = len(message)
-    send_length = str(msg_length).encode(FORMAT)
-    send_length += b' ' * (HEADER - len(send_length))
-    client.send(send_length)
-    client.send(message)
+def handle_client(conn, addr):
+    print(f"[NUEVA CONEXIÓN] Conectado desde {addr}")
+  
+    connected = True
+    while connected:
+          msg_length = conn.recv(HEADER).decode(FORMAT)
+          if msg_length:
+              msg_length = int(msg_length)
+              msg = conn.recv(msg_length).decode(FORMAT)
+              if msg == INIT:
+                global ID
+                ID = conn.recv(msg_length).decode(FORMAT)
+              if msg == FIN:
+                  connected = False
+              print(f" He recibido del cliente [{addr}] el mensaje: {msg}")
+              conn.send(f"HOLA CLIENTE: He recibido tu mensaje: {msg} ".encode(FORMAT))
+    print("ADIOS. TE ESPERO EN OTRA OCASION")
+    conn.close()
+
+def start():
+  server.listen()
+  print(f"[LISTENING] Servidor a la escucha en {IP_SERVER}:{PORT_SERVER}")
+  
+  while True:
+    conn, addr = server.accept()
+    numero_conexiones = threading.active_count()-1
+
+    if numero_conexiones <= MAX_ACTIVAS:
+      thread = threading.Thread(target=handle_client, args=(conn, addr))
+      thread.start()
+      print(f"[CONEXIONES ACTIVAS] {numero_conexiones}")
+      print(f"CONEXIONES RESTANTES: {MAX_ACTIVAS - numero_conexiones}")
+    else:
+      print("OOppsss... DEMASIADAS CONEXIONES. ESPERANDO A QUE ALGUIEN SE VAYA")
+      conn.send("OOppsss... Demasiadas conexiones. Espera a que alguien se vaya.".encode(FORMAT))
+      conn.close()
     
 ########## MAIN ##########
+#Engine: Module that receives information from the flow meter and activates the solenoid valve. 
 if  (len(sys.argv) == 5):
-    IP_BROKER = sys.argv[1]
-    PORT_BROKER = int(sys.argv[2])
+    IP_SERVER = sys.argv[1]
+    PORT_SERVER = int(sys.argv[2])
     IP_MONITOR = sys.argv[3]
     PORT_MONITOR = int(sys.argv[4])
 
-    ADDR_BROKER = (IP_BROKER, PORT_BROKER)
+    ADDR_SERVER = (IP_SERVER, PORT_SERVER)
     ADDR_MONITOR = (IP_MONITOR, PORT_MONITOR)
-
-    msg=sys.argv[5]
-    while msg != FIN :
-        print("Envio al servidor: ", msg)
-        send(msg)
-        print("Recibo del Servidor: ", client.recv(2048).decode(FORMAT))
-        msg=input()
-    print("Cierro conexión")
-    send(FIN)
-    client.close()
-else:
-    print ("Oops!. Parece que algo falló. Necesito estos argumentos: <ServerIP> <Puerto> <Estacion> <Ubicacion>")
+    
+    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server.bind(ADDR_SERVER)
+    print("[STARTING] Servidor inicializándose...")
+    
+    flow_meter = 0.0
+    leak_detector = False
+    solenoid_valve_evaluator = False
+        
+    start()    
