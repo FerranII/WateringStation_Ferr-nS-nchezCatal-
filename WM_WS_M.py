@@ -26,35 +26,46 @@ if  (len(sys.argv) == 6):
     ID_ESTACION = sys.argv[4]
     UBICACION = sys.argv[5]
     
+    #Central
     ADDR_CENTRAL = (IP_CENTRAL, PORT_CENTRAL)
     client_central = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     client_central.connect(ADDR_CENTRAL)
     print (f"Establecida conexión en [{ADDR_CENTRAL}]")
     
-    tramaRegistro = (f"REGISTRO#{ID_ESTACION}#{UBICACION}")
-    send(tramaRegistro, client_central)
+    tramaRegistroCentral = (f"REGISTRO#{ID_ESTACION}#{UBICACION}")
+    send(tramaRegistroCentral, client_central)
     repuestaEsperada = "STATUS#OK#Estacion registrada correctamente"
     
     respuesta = client_central.recv(2048).decode(FORMAT)
-    print("Recibo del Servidor: ", respuesta)
+    print("Recibo de la Central: ", respuesta)
 
     respuestaEsperada = "STATUS#OK#Estacion registrada correctamente"
     if respuesta.strip() == respuestaEsperada:
         print("Estación registrada en Central.")  
     else:
-        print("ERROR al intenrar registrar la estación en Central")
+        print("ERROR al intentar registrar la estación en Central")
         client_central.close()
-            
+    
+    
+    #Engine
     ADDR_WS = ("localhost", PORT_WS)
     client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     client.connect(ADDR_WS)
-    print (f"Establecida conexión WS")
-    msg = input()
-    while msg != FIN:
-        print("Envio al servidor: ", msg)
-        send(msg, client_central)
-        print("Recibo del Servidor: ", client_central.recv(2048).decode(FORMAT))
-        msg=input()
+    
+    tramaRegistroEngine = (f"REGISTRO#{ID_ESTACION}#{UBICACION}")
+    send(tramaRegistroEngine, client_central)
+    repuestaEsperada = "STATUS#OK#Estacion conectada a engine correctamente"
+    
+    respuesta = client_central.recv(2048).decode(FORMAT)
+    print("Recibo del Engine: ", respuesta)
+    
+    respuestaEsperada = "STATUS#OK#Estacion registrada correctamente"
+    if respuesta.strip() == respuestaEsperada:
+        print("Estación registrada en Central.")  
+    else:
+        print("ERROR al intentar conectarse a engine")
+        client_central.close()
+    
         
         
     """
