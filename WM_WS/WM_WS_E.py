@@ -10,19 +10,41 @@ FORMAT = 'utf-8'
 FIN = "FIN"
 MAX_ACTIVAS = 1
 
+def send(msg, client):
+    message = msg.encode(FORMAT)
+    msg_length = len(message)
+    send_length = str(msg_length).encode(FORMAT)
+    send_length += b' ' * (HEADER - len(send_length))
+    client.send(send_length)
+    client.send(message)
+    
 def handle_client(conn, addr):
     print(f"[NUEVA CONEXIÓN] Conectado desde {addr}")
   
     connected = True
     while connected:
-          msg_length = conn.recv(HEADER).decode(FORMAT)
-          if msg_length:
-              msg_length = int(msg_length)
-              msg = conn.recv(msg_length).decode(FORMAT)
-              if msg == FIN:
-                  connected = False
-              print(f" He recibido del cliente [{addr}] el mensaje: {msg}")
-              conn.send(f"HOLA CLIENTE: He recibido tu mensaje: {msg} ".encode(FORMAT))
+        msg_length = conn.recv(HEADER).decode(FORMAT)
+        if msg_length:
+            msg_length = int(msg_length)
+            msg = conn.recv(msg_length).decode(FORMAT)
+            if msg == FIN:
+                connected = False
+            elif "REGISTRO" in msg:
+                partes = msg.split('#')
+                if(len(partes) == 2):
+                    ID_ESTACION = partes[1]
+                    print("Recibida la trama del cliente")
+                    print("ID_ESTACION -> "+ID_ESTACION)
+                    conn.send("STATUS#OK#Estacion conectada a Engine correctamente".encode(FORMAT))
+                continue    
+                    
+            elif msg == "Health-Check":
+                print("Recibido Health-msg")
+                conn.send("STATUS#OK#Health recibido".encode(FORMAT))
+                continue
+            
+            print(f" He recibido del cliente [{addr}] el mensaje: {msg}")
+            conn.send(f"HOLA CLIENTE: He recibido tu mensaje: {msg} ".encode(FORMAT))
     print("ADIOS. TE ESPERO EN OTRA OCASION")
     conn.close()
 
@@ -37,8 +59,6 @@ def start():
     if numero_conexiones <= MAX_ACTIVAS:
       thread = threading.Thread(target=handle_client, args=(conn, addr))
       thread.start()
-      print(f"CONEXIONES ACTIVAS: {numero_conexiones}")
-      print(f"CONEXIONES RESTANTES: {MAX_ACTIVAS - numero_conexiones}")
     else:
       print("ERROR: Solo se debe conectar el monitor correspondiente.")
       conn.send("ERROR: Solo se debe conectar el monitor correspondiente.".encode(FORMAT))
