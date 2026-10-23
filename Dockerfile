@@ -7,4 +7,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 #PUERTO Central
 EXPOSE 5050 
-CMD ["python", "WM_Central.py", "5050", "broker:9092"]
+CMD ["python", "WM_Central/WM_Central.py", "5050", "metro.proxy.rlwy.net:15921"]
