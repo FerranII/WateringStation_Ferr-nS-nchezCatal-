@@ -41,23 +41,23 @@ COLOR_BLANCO = "#ffffff"
 def estado_AVAILABLE(i):
     global AVAILABLE
     if(i): AVAILABLE += 1
-    else: AVAILABLE -=1
+    else: AVAILABLE = max(0, AVAILABLE - 1)
 def estado_WATERING(i):
     global WATERING
     if(i): WATERING += 1
-    else: WATERING -=1
+    else: WATERING = max(0, WATERING - 1)
 def estado_LEAK(i):
     global LEAK
     if(i): LEAK += 1
-    else: LEAK -=1
+    else: LEAK = max(0, LEAK - 1)
 def estado_OUT_OF_SERVICE(i):
     global OUT_OF_SERVICE
     if(i): OUT_OF_SERVICE += 1
-    else: OUT_OF_SERVICE -=1
+    else: OUT_OF_SERVICE = max(0, OUT_OF_SERVICE - 1)
 def estado_OFFLINE(i):
     global OFFLINE
     if(i): OFFLINE += 1
-    else: OFFLINE -=1 
+    else: OFFLINE = max(0, OFFLINE - 1)
           
 #############BASE DATOS###############################    
 def obetener_WS(ID):
