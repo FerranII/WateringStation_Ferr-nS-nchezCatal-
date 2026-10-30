@@ -8,7 +8,6 @@ SERVER = "0.0.0.0"
 ADDR = (SERVER, PORT)
 FORMAT = 'utf-8'
 FIN = "FIN"
-MAX_ACTIVAS = 1
 
 VALORES_HEALTH = ("OK", "KO")
 def send(msg, client):
@@ -18,7 +17,18 @@ def send(msg, client):
     send_length += b' ' * (HEADER - len(send_length))
     client.send(send_length)
     client.send(message)
-    
+
+def teclado():
+    global health_engine
+    try:
+        while True:
+            tecla = input()
+            if tecla.strip().lower() == 'm':
+                health_engine = "KO"
+                break
+    except Exception as e:
+        print(f"[Engine] Error por teclado: {e}")
+            
 def health_check(msg): #devuelve los datos de la engine
     global flow_meter, accum_Vol, solenoid_valve, health_engine
     
@@ -34,7 +44,7 @@ def health_check(msg): #devuelve los datos de la engine
         accum_Vol += flow_meter/60
             
     return f"HEALTH_UPDATE#{health_engine}#{flow_meter}#{accum_Vol}#{solenoid_valve}"
-        
+
 def handle_client(conn, addr):
     global flow_meter, accum_Vol, solenoid_valve, health_engine
     print(f"[NUEVA CONEXIÓN] Conectado desde {addr}")
@@ -53,7 +63,7 @@ def handle_client(conn, addr):
                     ID_ESTACION = partes[1]
                     print("Recibida la trama del cliente")
                     print("ID_ESTACION -> "+ID_ESTACION)
-                    conn.send("STATUS#OK#Estacion conectada a Engine correctamente".encode(FORMAT))
+                    send("STATUS#OK#Estacion conectada a Engine correctamente", conn)
                 continue    
                     
             elif msg == "Health-Check":
@@ -85,15 +95,8 @@ def start():
   
   while True:
     conn, addr = server.accept()
-    numero_conexiones = threading.active_count()-1
-
-    if numero_conexiones <= MAX_ACTIVAS:
-      thread = threading.Thread(target=handle_client, args=(conn, addr))
-      thread.start()
-    else:
-      print("ERROR: Solo se debe conectar el monitor correspondiente.")
-      conn.send("ERROR: Solo se debe conectar el monitor correspondiente.".encode(FORMAT))
-      conn.close()
+    thread = threading.Thread(target=handle_client, args=(conn, addr))
+    thread.start()
     
 ########## MAIN ##########
 #Engine: Module that receives information from the flow meter and activates the solenoid valve.
@@ -113,9 +116,13 @@ if  (len(sys.argv) == 5):
     print("Servidor inicializándose para monitor")
     
     accum_Vol = 0.0
-    solenoid_valve = False #If false->closed, true->opened
+    solenoid_valve = False #false->closed, true->opened
     health_engine = "OK"
+    
+    hilo_teclado = threading.Thread(target=teclado, daemon=True)
+    hilo_teclado.start()
+    
     start()    
 
 else:
-    print ("Oops!. Parece que algo falló. Necesito estos argumentos: <IP_Queue> <PORT_Queue> <PORT_Monitor> ")
+    print ("Oops!. Parece que algo falló. Necesito estos argumentos:  <IP_Queue> <PORT_Queue> <PORT_Monitor> <Flow_meter>")

@@ -16,6 +16,12 @@ def send(msg, client):
     send_length += b' ' * (HEADER - len(send_length))
     client.send(send_length)
     client.send(message)
+def recv_msg(client):
+    msg_length = client.recv(HEADER).decode(FORMAT)
+    if msg_length:
+        msg_length = int(msg_length.strip())
+        return client.recv(msg_length).decode(FORMAT)
+    return ""
 
 def check_engine(client_engine, client_central):
     try:
@@ -34,9 +40,12 @@ def check_engine(client_engine, client_central):
                 partes = msg_engine.split("#")
                 if "HEALTH_UPDATE" in msg_engine:
                     datos_engine = "#".join(partes[1:])
-                    trama_Health_Central = f"STATUS_ENGINE#{ID_ESTACION}#{datos_engine}"
+                    if "KO" in msg_engine or "LEAK" in msg_engine:
+                        trama_Health_Central = f"STATUS_ENGINE#{ID_ESTACION}#LEAK"
+                    else:
+                        trama_Health_Central = f"STATUS_ENGINE#{ID_ESTACION}#{datos_engine}"
                 
-                send(trama_Health_Central, client_central)
+                if trama_Health_Central: send(trama_Health_Central, client_central)
             time.sleep(1.0)
             
     except Exception as e:
@@ -81,10 +90,10 @@ if  (len(sys.argv) == 6):
     client_central.connect(ADDR_CENTRAL)
     print (f"Establecida conexión en [{ADDR_CENTRAL}]")
     
-    tramaRegistroCentral = (f"REGISTRO#{ID_ESTACION}#{UBICACION}")
+    tramaRegistroCentral = (f"REGISTRO_M#{ID_ESTACION}#{UBICACION}")
     send(tramaRegistroCentral, client_central)
     
-    respuestaCentral = client_central.recv(2048).decode(FORMAT)
+    respuestaCentral = recv_msg(client_central)
     print("Recibo de la Central: ", respuestaCentral)
     respuestaEsperada = "STATUS#OK#Estacion registrada correctamente"
 
@@ -100,10 +109,10 @@ if  (len(sys.argv) == 6):
     client_engine = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     client_engine.connect(ADDR_WS)
     
-    tramaRegistroEngine = (f"REGISTRO#{ID_ESTACION}")
+    tramaRegistroEngine = (f"REGISTRO_M#{ID_ESTACION}")
     send(tramaRegistroEngine, client_engine)
     
-    respuestaEngine = client_engine.recv(2048).decode(FORMAT)
+    respuestaEngine = recv_msg(client_engine)
     print("Recibo del Engine: ", respuestaEngine)
     respuestaEsperada = "STATUS#OK#Estacion conectada a Engine correctamente"
     

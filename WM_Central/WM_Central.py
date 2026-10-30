@@ -164,12 +164,7 @@ def start():
             print("CONEXIONES RESTANTES PARA CERRAR EL SERVICIO", MAX_CONEXIONES-NUMERO_CLIENTES)
         else:
             print("OOppsss... DEMASIADAS CONEXIONES.")
-            aviso = "OOppsss... DEMASIADAS CONEXIONES."
-            msg_bytes = aviso.encode(FORMAT)
-            send_length = str(len(msg_bytes)).encode(FORMAT)
-            send_length += b' ' * (HEADER - len(send_length))
-            conn.send(send_length)
-            conn.send(msg_bytes)
+            send("OOppsss... DEMASIADAS CONEXIONES.", conn)
             conn.close()
             
 #############RESPONDER CLIENTES###############################
@@ -185,7 +180,7 @@ def handle_client(conn, addr):
             if msg == FIN:
                 connected = False
                 
-            elif "REGISTRO" in msg:
+            elif "REGISTRO_M" in msg:
                 partes = msg.split('#')
                 if(len(partes) == 3):
                     ID_ESTACION = partes[1]
@@ -195,12 +190,21 @@ def handle_client(conn, addr):
                     print("Location -> "+LOCATION)
                     
                     with LOCK_MONITORES: clientes_monitores[ID_ESTACION] = conn
-                    conn.send("STATUS#OK#Estacion registrada correctamente".encode(FORMAT))
+                    send(f"STATUS#OK#Estacion registrada correctamente", conn)
                     insertar_WS(ID_ESTACION, LOCATION)
                     actualizar_estado_WS(ID_ESTACION,"AVAILABLE");
                 else:
-                    conn.send("STATUS#ERROR#Trama incorrecta".encode(FORMAT))
-            
+                    send(f"STATUS#ERROR#Trama incorrecta", conn)
+                    
+            elif "REGISTRO_FO" in msg:
+                partes = msg.split('#')
+                if len(partes) == 2:
+                    id_operario = partes[1]
+                    print(f"[REGISTRO FO] Operario conectado: {id_operario}")
+                    send(f"STATUS#OK#Operario registrado correctamente", conn)
+                else:
+                    send("STATUS#ERROR#Trama de registro FO incorrecta", conn)
+                    
             elif "STATUS_ENGINE" in msg:
                 partes = msg.split('#')
                 if len(partes) == 6:
@@ -225,7 +229,7 @@ def handle_client(conn, addr):
                     
             else:
                 print(f" He recibido del cliente [{addr}] el mensaje: {msg}")
-                conn.send(f"HOLA CLIENTE: He recibido tu mensaje: {msg} ".encode(FORMAT))
+                send(f"HOLA CLIENTE: He recibido tu mensaje: {msg} ", conn)
     print("ADIOS. TE ESPERO EN OTRA OCASION")
     conn.close()
     
