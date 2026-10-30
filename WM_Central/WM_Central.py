@@ -183,8 +183,7 @@ def handle_client(conn, addr):
                         insertar_WS(ID_ESTACION, LOCATION)
                         actualizar_estado_WS(ID_ESTACION, "AVAILABLE")
                     else:
-                        send(f"STATUS#ERROR#Trama incorrecta", conn)
-                        
+                        send(f"STATUS#ERROR#Trama incorrecta", conn)       
                 elif "REGISTRO_FO" in msg:
                     partes = msg.split('#')
                     if len(partes) == 2:
@@ -215,8 +214,6 @@ def handle_client(conn, addr):
                         datos_ws = obetener_WS(id_estacion)
                         estado_actual = datos_ws[POS_STATUS] if datos_ws else "OFFLINE"
                         if(estado_actual != "LEAK"): actualizar_estado_WS(id_estacion, "LEAK")
-
-                # Comandos recibidos desde la interfaz gráfica local
                 elif "SOLENOID" in msg or "ACTIVATE" in msg or "DELETE" in msg:
                     print(f"[COMANDO UI] Recibido desde panel local: {msg}")
                     partes = msg.split('#')
@@ -233,6 +230,19 @@ def handle_client(conn, addr):
                         actualizar_estado_WS(partes[1], "AVAILABLE")
                     elif partes[0] == "DELETE" and len(partes) == 2:
                         delete_WS(partes[1])
+                        
+                elif "GET_ALL_WS" in msg:
+                    estaciones = obtener_todas_WS()
+                    resumen = {
+                        "AVAILABLE": AVAILABLE,
+                        "WATERING": WATERING,
+                        "LEAK": LEAK,
+                        "OUT_OF_SERVICE": OUT_OF_SERVICE,
+                        "OFFLINE": OFFLINE,
+                        "estaciones": estaciones
+                    }
+                    send(json.dumps(resumen), conn)
+                           
                 else:
                     print(f"He recibido del cliente [{addr}] el mensaje: {msg}")
                     send(f"HOLA CLIENTE: He recibido tu mensaje: {msg} ", conn)
