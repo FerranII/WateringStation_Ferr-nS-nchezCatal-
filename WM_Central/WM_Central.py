@@ -4,6 +4,7 @@ import json
 import time
 import sqlite3
 import os
+import shutil
 
 from kafka import KafkaConsumer, KafkaProducer
 
@@ -61,6 +62,7 @@ def estado_OFFLINE(i):
 ############# BASE DATOS ###############################
 if os.path.exists("/data"):
     DB_PATH = "/data/WS_BaseDatos.db"
+    if not os.path.exists(DB_PATH) and os.path.exists("WS_BaseDatos.db"): shutil.copy("WS_BaseDatos.db", DB_PATH)
 else:
     DB_PATH = "WS_BaseDatos.db"
 
@@ -170,6 +172,7 @@ def start():
 def handle_client(conn, addr):
     print(f"[NUEVA CONEXION] {addr} connected.")
     connected = True
+    id_registro = None
     while connected:
         try:
             msg_length = conn.recv(HEADER).decode(FORMAT)
@@ -187,6 +190,8 @@ def handle_client(conn, addr):
                         print(f"Recibida trama registro - ID: {ID_ESTACION} | Location: {LOCATION}")
                         with LOCK_MONITORES: clientes_monitores[ID_ESTACION] = conn
                         send(f"STATUS#OK#Estacion registrada correctamente", conn)
+                        
+                        id_registro = ID_ESTACION
                         insertar_WS(ID_ESTACION, LOCATION)
                         actualizar_estado_WS(ID_ESTACION, "AVAILABLE")
                     else:
@@ -256,6 +261,12 @@ def handle_client(conn, addr):
         except Exception as e:
             print(f"[ERROR CONEXION] {e}")
             break
+        finally:
+            if id_registro:
+                print(f"La estación {id_registro} se ha desconectado")
+                actualizar_estado_WS(id_registro, "OFFLINE")
+                with LOCK_MONITORES:
+                    if id_registro in clientes_monitores: del clientes_monitores[id_registro]
             
     print("ADIOS. TE ESPERO EN OTRA OCASION")
     conn.close()
