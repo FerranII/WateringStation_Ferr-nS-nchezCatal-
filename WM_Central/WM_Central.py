@@ -4,6 +4,7 @@ import json
 import time
 import sqlite3
 import os
+import shutil
 
 from kafka import KafkaConsumer, KafkaProducer
 
@@ -61,6 +62,9 @@ def estado_OFFLINE(i):
 ############# BASE DATOS ###############################
 if os.path.exists("/data"):
     DB_PATH = "/data/WS_BaseDatos.db"
+    if not os.path.exists(DB_PATH) and os.path.exists("WS_BaseDatos.db"):
+        shutil.copy("WS_BaseDatos.db", DB_PATH)
+        print("[DB] Base de datos inicial copiada al volumen persistente de Railway.")
 else:
     DB_PATH = "WS_BaseDatos.db"
         
