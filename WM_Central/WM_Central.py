@@ -3,6 +3,7 @@ import threading
 import json
 import time
 import sqlite3
+import os
 
 from kafka import KafkaConsumer, KafkaProducer
 
@@ -28,7 +29,8 @@ def send(msg, client):
         client.send(message)
     except Exception as e:
         print(f"[ERROR SEND] No se pudo enviar mensaje al cliente: {e}")
-    
+
+############# ESTADOS ###############################    
 ESTADOS_VALIDOS = ["AVAILABLE", "WATERING", "LEAK", "OUT_OF_SERVICE", "OFFLINE"]
 
 def estado_AVAILABLE(i):
@@ -56,10 +58,15 @@ def estado_OFFLINE(i):
     if(i): OFFLINE += 1
     else: OFFLINE = max(0, OFFLINE - 1)
           
-############# BASE DATOS ###############################    
+############# BASE DATOS ###############################
+if os.path.exists("/data"):
+    DB_PATH = "/data/WS_BaseDatos.db"
+else:
+    DB_PATH = "WS_BaseDatos.db"
+        
 def obetener_WS(ID):
     try:
-        conexion = sqlite3.connect('WS_BaseDatos.db')
+        conexion = sqlite3.connect(DB_PATH)
         cursor = conexion.cursor()
         cursor.execute("SELECT ID, Location, Volume, Status FROM WS WHERE ID = ?", (ID,))
         resultado = cursor.fetchone()
@@ -71,7 +78,7 @@ def obetener_WS(ID):
 
 def obtener_todas_WS():
     try:
-        conexion = sqlite3.connect('WS_BaseDatos.db')
+        conexion = sqlite3.connect(DB_PATH)
         cursor = conexion.cursor()
         cursor.execute("SELECT ID, Location, Volume, Status FROM WS ORDER BY ID ASC")
         resultados = cursor.fetchall()
@@ -83,7 +90,7 @@ def obtener_todas_WS():
 
 def insertar_WS(ID, Location):
     try:
-        conexion = sqlite3.connect('WS_BaseDatos.db')
+        conexion = sqlite3.connect(DB_PATH)
         cursor = conexion.cursor()
         cursor.execute("""INSERT OR IGNORE INTO WS (ID, Location) VALUES (?, ?)""", (ID, Location))
         conexion.commit()
@@ -93,7 +100,7 @@ def insertar_WS(ID, Location):
 
 def delete_WS(ID):
     try:
-        conexion = sqlite3.connect('WS_BaseDatos.db')
+        conexion = sqlite3.connect(DB_PATH)
         cursor = conexion.cursor()
         cursor.execute("DELETE FROM WS WHERE ID = ?", (ID,))
         conexion.commit()
@@ -104,7 +111,7 @@ def delete_WS(ID):
 
 def actualizar_volumen_WS(ID, volume):
     try:
-        conexion = sqlite3.connect('WS_BaseDatos.db')
+        conexion = sqlite3.connect(DB_PATH)
         cursor = conexion.cursor()
         cursor.execute("""UPDATE WS SET Volume = ? WHERE ID = ?""", (float(volume), ID))
         conexion.commit()
@@ -123,7 +130,7 @@ def actualizar_estado_WS(ID, Status):
         "OFFLINE": estado_OFFLINE
     }
     try:
-        conexion = sqlite3.connect('WS_BaseDatos.db')
+        conexion = sqlite3.connect(DB_PATH)
         cursor = conexion.cursor()
 
         cursor.execute("SELECT Status FROM WS WHERE ID = ?", (ID,))
