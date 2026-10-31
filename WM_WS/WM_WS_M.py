@@ -74,8 +74,6 @@ def handle_central(client_engine, client_central):
         print(f"[MONITOR] Conexión cerrada con la Central: {e}")
     
 ########## MAIN ##########
-#Monitor: Module that monitors the health of the entire system and reports any fault (leak) to CENTRAL. It is also used to authenticate and register the WS with 
-#the central system when appropriate. 
 #Formato: <PORT_WS> <IP_CENTRAL> <PORT_CENTRAL> <ID_ESTACION> <UBICACION> 
 if  (len(sys.argv) == 6):
     PORT_WS = int(sys.argv[1])
@@ -84,43 +82,56 @@ if  (len(sys.argv) == 6):
     ID_ESTACION = sys.argv[4]
     UBICACION = sys.argv[5]
     
-    #Central
-    ADDR_CENTRAL = (IP_CENTRAL, PORT_CENTRAL)
-    client_central = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    client_central.connect(ADDR_CENTRAL)
-    print (f"Establecida conexión en [{ADDR_CENTRAL}]")
-    
-    tramaRegistroCentral = (f"REGISTRO_M#{ID_ESTACION}#{UBICACION}")
-    send(tramaRegistroCentral, client_central)
-    
-    respuestaCentral = recv_msg(client_central)
-    print("Recibo de la Central: ", respuestaCentral)
-    respuestaEsperada = "STATUS#OK#Estacion registrada correctamente"
+    try: #Central
+        ADDR_CENTRAL = (IP_CENTRAL, PORT_CENTRAL)
+        client_central = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        client_central.connect(ADDR_CENTRAL)
+        
+        tramaRegistroCentral = f"REGISTRO_M#{ID_ESTACION}#{UBICACION}"
+        send(tramaRegistroCentral, client_central)
+        
+        respuestaCentral = recv_msg(client_central)
+        print("Recibo de la Central: ", respuestaCentral)
+        respuestaEsperada = "STATUS#OK#Estacion registrada correctamente"
 
-    if respuestaCentral.strip() == respuestaEsperada:
-        print("Estación registrada en Central.")  
-    else:
-        print("ERROR al intentar registrar la estación en Central")
-        client_central.close()
+        if respuestaCentral.strip() == respuestaEsperada:
+            print("Estación registrada en la Central")  
+        else:
+            print("ERROR: La Central rechazó el registro")
+            client_central.close()
+            sys.exit(1)
+                  
+    except Exception as e:
+        print(f"[ERROR CRÍTICO] Imposible conectar con la Central en {IP_CENTRAL}:{PORT_CENTRAL}: {e}")
+        sys.exit(1)
     
     
-    #Engine
-    ADDR_WS = ("localhost", PORT_WS)
-    client_engine = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    client_engine.connect(ADDR_WS)
-    
-    tramaRegistroEngine = (f"REGISTRO_M#{ID_ESTACION}")
-    send(tramaRegistroEngine, client_engine)
-    
-    respuestaEngine = recv_msg(client_engine)
-    print("Recibo del Engine: ", respuestaEngine)
-    respuestaEsperada = "STATUS#OK#Estacion conectada a Engine correctamente"
-    
-    if respuestaEngine.strip() == respuestaEsperada:
-        print("Estación conectada con Engine.")  
-    else:
-        print("ERROR al intentar conectarse a Engine")
-        client_engine.close()
+    try: #Engine
+        ADDR_WS = ("localhost", PORT_WS)
+        client_engine = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        client_engine.connect(ADDR_WS)
+        
+        tramaRegistroEngine = f"REGISTRO_M#{ID_ESTACION}"
+        send(tramaRegistroEngine, client_engine)
+        
+        respuestaEngine = recv_msg(client_engine)
+        print("Recibo del Engine: ", respuestaEngine)
+        respuestaEsperadaEngine = "STATUS#OK#Estacion conectada a Engine correctamente"
+        
+        if respuestaEngine.strip() == respuestaEsperadaEngine:
+            print("Estación conectada con el Engine")  
+        else:
+            print("ERROR: El Engine rechazó la conexión.")
+            client_engine.close()
+            if client_central:
+                client_central.close()
+            sys.exit(1)
+            
+    except Exception as e:
+        print(f"[ERROR CRÍTICO] Imposible conectar con el Engine en localhost:{PORT_WS}: {e}")
+        if client_central:
+            client_central.close()
+        sys.exit(1)
     
     hilo_engine = threading.Thread(target=check_engine, args=(client_engine, client_central), daemon=True)
     hilo_engine.start()

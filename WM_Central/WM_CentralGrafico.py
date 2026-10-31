@@ -54,7 +54,7 @@ def send(msg):
     except Exception as e:
         print(f"[ERROR] Fallo al enviar mensaje: {e}")
 
-def recibir_msg(sock):
+def recv_msg(sock):
     header_data = sock.recv(HEADER)
     if not header_data:
         return None
@@ -68,12 +68,11 @@ def recibir_msg(sock):
         data += packet
     return data.decode(FORMAT)
 
-def pedir_datos():
-    if not client_socket:
-        return None
+def pedir_todas_WS():
+    if not client_socket: return None
     try:
         send("GET_ALL_WS")
-        json_str = recibir_msg(client_socket)
+        json_str = recv_msg(client_socket)
         if json_str:
             return json.loads(json_str)
     except Exception as e:
@@ -123,7 +122,7 @@ def refrescar_interfaz():
     id_seleccion = WS_seleccionada()
     item_a_seleccionar = None
             
-    datos_sistema = pedir_datos()
+    datos_sistema = pedir_todas_WS()
     
     if datos_sistema:
         for row in tabla.get_children():
@@ -151,7 +150,7 @@ def refrescar_interfaz():
         txt_numOffline.config(text=f"Offline: {datos_sistema.get('OFFLINE', 0)}")
     
     WATERING_BLINK = not WATERING_BLINK 
-    root.after(1000, refrescar_interfaz)
+    root.after(500, refrescar_interfaz)
     
 def apartado_grafico():
     global root, tabla
@@ -159,7 +158,7 @@ def apartado_grafico():
     global txt_numAvailable, txt_numWatering, txt_numLeak, txt_numOutOfService, txt_numOffline
     
     root = tk.Tk()
-    root.title("WM_Central (Local Panel) - Irrigation Monitoring Panel")
+    root.title("WM_Central - Irrigation Monitoring Panel")
     root.geometry("800x500")
     barra_botones = tk.Frame(root, bg=COLOR_BLANCO, bd=2, relief=tk.RAISED)
 

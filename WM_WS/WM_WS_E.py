@@ -23,9 +23,13 @@ def teclado():
     try:
         while True:
             tecla = input()
-            if tecla.strip().lower() == 'm':
-                health_engine = "KO"
-                break
+            if tecla.strip().lower() == 'k':
+                if(health_engine != "KO"):
+                    health_engine = "KO"
+                    break
+                else:
+                    health_engine = "OK"
+                    break
     except Exception as e:
         print(f"[Engine] Error por teclado: {e}")
             
@@ -99,7 +103,6 @@ def start():
     thread.start()
     
 ########## MAIN ##########
-#Engine: Module that receives information from the flow meter and activates the solenoid valve.
 #Formato: <IP_Queue> <PORT_Queue> <PORT_Monitor> <Flow_meter>
 if  (len(sys.argv) == 5):
     IP_QUEUE = sys.argv[1]
