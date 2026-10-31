@@ -4,7 +4,6 @@ import json
 import time
 import sqlite3
 import os
-import shutil
 
 from kafka import KafkaConsumer, KafkaProducer
 
@@ -62,12 +61,27 @@ def estado_OFFLINE(i):
 ############# BASE DATOS ###############################
 if os.path.exists("/data"):
     DB_PATH = "/data/WS_BaseDatos.db"
-    if not os.path.exists(DB_PATH) and os.path.exists("WS_BaseDatos.db"):
-        shutil.copy("WS_BaseDatos.db", DB_PATH)
-        print("[DB] Base de datos inicial copiada al volumen persistente de Railway.")
 else:
     DB_PATH = "WS_BaseDatos.db"
-        
+
+def inicializar_db():
+    try:
+        conexion = sqlite3.connect(DB_PATH)
+        cursor = conexion.cursor()
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS WS (
+                ID TEXT PRIMARY KEY,
+                Location TEXT,
+                Volume REAL DEFAULT 0.0,
+                Status TEXT DEFAULT 'OFFLINE'
+            )
+        """)
+        conexion.commit()
+        conexion.close()
+        print("[DB] Base de datos inicializada correctamente.")
+    except Exception as e:
+        print(f"[DB ERROR] No se pudo crear la tabla: {e}")
+               
 def obetener_WS(ID):
     try:
         conexion = sqlite3.connect(DB_PATH)
@@ -287,6 +301,8 @@ if __name__ == "__main__":
     OFFLINE = len(estaciones)
     WATERING, AVAILABLE, LEAK, OUT_OF_SERVICE = 0, 0, 0, 0
 
+    inicializar_db()
+    
     hilo_servidor = threading.Thread(target=start, daemon=True)
     hilo_servidor.start()
 
