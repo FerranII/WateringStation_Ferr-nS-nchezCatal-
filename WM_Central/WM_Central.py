@@ -64,24 +64,6 @@ if os.path.exists("/data"):
 else:
     DB_PATH = "WS_BaseDatos.db"
 
-def inicializar_db():
-    try:
-        conexion = sqlite3.connect(DB_PATH)
-        cursor = conexion.cursor()
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS WS (
-                ID TEXT PRIMARY KEY,
-                Location TEXT,
-                Volume REAL DEFAULT 0.0,
-                Status TEXT DEFAULT 'OFFLINE'
-            )
-        """)
-        conexion.commit()
-        conexion.close()
-        print("[DB] Base de datos inicializada correctamente.")
-    except Exception as e:
-        print(f"[DB ERROR] No se pudo crear la tabla: {e}")
-               
 def obetener_WS(ID):
     try:
         conexion = sqlite3.connect(DB_PATH)
@@ -300,8 +282,6 @@ if __name__ == "__main__":
         print(f"Estación ID: {estacion[POS_ID]}, Ubicación: {estacion[POS_LOCATION]}, Volume: {estacion[POS_VOLUME]}, Status: {estacion[POS_STATUS]}")
     OFFLINE = len(estaciones)
     WATERING, AVAILABLE, LEAK, OUT_OF_SERVICE = 0, 0, 0, 0
-
-    inicializar_db()
     
     hilo_servidor = threading.Thread(target=start, daemon=True)
     hilo_servidor.start()
