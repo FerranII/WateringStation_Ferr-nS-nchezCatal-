@@ -108,7 +108,7 @@ def delete_WS(ID):
         conexion.commit()
         conexion.close()
         print(f"[DB SUCCESS] Estación {ID} eliminada correctamente.")
-        send_kafka("ELIMINACION_ESTACION", ID)
+        send_kafka("ELIMINACION_ESTACION", ID, "OFFLINE")
     except Exception as e:
         print(f"[DB ERROR]: {e}")
 
@@ -166,6 +166,11 @@ except Exception as e:
     producer = None
     
 def send_kafka(tipo_evento, id_estacion, estado, ubicacion=""):
+    texto_log = f"[{time.strftime('%H:%M:%S')}] {tipo_evento} -> Estación {id_estacion} ({estado})"
+    with LOCK_MONITORES:
+        historial_kafka.append(texto_log)
+        if len(historial_kafka) > 50: historial_kafka.pop(0)
+        
     if not producer: return
     try:
         mensaje = {
@@ -175,12 +180,8 @@ def send_kafka(tipo_evento, id_estacion, estado, ubicacion=""):
             "ubicacion": ubicacion,
             "timestamp": time.time()
         }
-        producer.send("Watering Station", value=mensaje)
+        producer.send("Watering_Station", value=mensaje)
         producer.flush()
-        texto_log = f"[{time.strftime('%H:%M:%S')}] {tipo_evento} -> Estación {id_estacion} ({estado})"
-        with LOCK_MONITORES:
-            historial_kafka.append(texto_log)
-            if len(historial_kafka) > 50: historial_kafka.pop(0)
         print(f"[KAFKA] Evento enviado: {tipo_evento} -> Estación {id_estacion}")
     except Exception as e:
         print(f"[KAFKA ERROR] Fallo al enviar mensaje a Kafka: {e}")

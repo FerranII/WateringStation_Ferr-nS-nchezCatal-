@@ -167,7 +167,7 @@ def refrescar_interfaz():
     root.after(500, refrescar_interfaz)
     
 def apartado_grafico():
-    global root, tabla
+    global root, tabla, txt_kafka_log
     global btn_StartWatering, btn_BLOCKWS, btn_ACTIVATEWS, btn_DELETEWS
     global txt_numAvailable, txt_numWatering, txt_numLeak, txt_numOutOfService, txt_numOffline
     
