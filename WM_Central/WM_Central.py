@@ -271,6 +271,30 @@ def handle_client(conn, addr):
                     
                 elif msg.startswith("LIST_WS"):
                     send(json.dumps({"estaciones": obtener_todas_WS()}), conn)
+                
+                elif msg.startswith("SOLICITUD_RIEGO"):
+                    partes = msg.split('#')
+                    if len(partes) == 3:
+                        ws_id, operario = partes[1], partes[2]
+                        print(f"[SOLICITUD RIEGO] {operario} pide riego en {ws_id}")
+                        send(f"[{ws_id}] Verificando disponibilidad...", conn)
+
+                        datos = obetener_WS(ws_id)
+                        with LOCK_MONITORES: conn_ws = clientes_monitores.get(ws_id)
+
+                        if not datos:
+                            send(f"[{ws_id}] Riego DENEGADO: la estación no existe", conn)
+                        elif not conn_ws:
+                            send(f"[{ws_id}] Riego DENEGADO: la estación no está conectada", conn)
+                        elif not check_irrigation(ws_id):
+                            send(f"[{ws_id}] Riego DENEGADO: estación no disponible ({datos[POS_STATUS]})", conn)
+                        else:
+                            send(f"[{ws_id}] Solicitando autorización a la estación...", conn)
+                            send("SOLENOID#OPEN", conn_ws)
+                            actualizar_estado_WS(ws_id, "WATERING")
+                            send(f"[{ws_id}] Riego AUTORIZADO. Abriendo válvula", conn)
+                    else:
+                        send("Solicitud de riego incorrecta", conn)
                            
                 else:
                     print(f"He recibido del cliente [{addr}] el mensaje: {msg}")
