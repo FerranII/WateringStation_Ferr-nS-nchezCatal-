@@ -15,6 +15,7 @@ FORMAT = 'utf-8'
 FIN = "FIN"
 MAX_CONEXIONES = 250
 POS_ID, POS_LOCATION, POS_VOLUME, POS_STATUS = 0, 1, 2, 3
+ESTADOS_VALIDOS = ["AVAILABLE", "WATERING", "LEAK", "OUT_OF_SERVICE", "OFFLINE"]
 
 clientes_monitores = {}
 LOCK_MONITORES = threading.Lock()
@@ -31,48 +32,12 @@ def send(msg, client):
     except Exception as e:
         print(f"[ERROR SEND] No se pudo enviar mensaje al cliente: {e}")
 
-############# ESTADOS ###############################    
-ESTADOS_VALIDOS = ["AVAILABLE", "WATERING", "LEAK", "OUT_OF_SERVICE", "OFFLINE"]
-
-def estado_AVAILABLE(i):
-    global AVAILABLE
-    if(i): AVAILABLE += 1
-    else: AVAILABLE = max(0, AVAILABLE - 1)
-
-def estado_WATERING(i):
-    global WATERING
-    if(i): WATERING += 1
-    else: WATERING = max(0, WATERING - 1)
-
-def estado_LEAK(i):
-    global LEAK
-    if(i): LEAK += 1
-    else: LEAK = max(0, LEAK - 1)
-
-def estado_OUT_OF_SERVICE(i):
-    global OUT_OF_SERVICE
-    if(i): OUT_OF_SERVICE += 1
-    else: OUT_OF_SERVICE = max(0, OUT_OF_SERVICE - 1)
-
-def estado_OFFLINE(i):
-    global OFFLINE
-    if(i): OFFLINE += 1
-    else: OFFLINE = max(0, OFFLINE - 1)
-          
 ############# BASE DE DATOS ###############################
 if os.path.exists("/data"):
     DB_PATH = "/data/WS_BaseDatos.db"
     if not os.path.exists(DB_PATH) and os.path.exists("WS_BaseDatos.db"): shutil.copy("WS_BaseDatos.db", DB_PATH)
 else:
     DB_PATH = "WS_BaseDatos.db"
-
-FUNCIONES_ESTADOS = {
-        "AVAILABLE": estado_AVAILABLE,
-        "WATERING": estado_WATERING,
-        "LEAK": estado_LEAK,
-        "OUT_OF_SERVICE": estado_OUT_OF_SERVICE,
-        "OFFLINE": estado_OFFLINE
-    }
 
 def obetener_WS(ID):
     try:
@@ -110,14 +75,9 @@ def insertar_WS(ID, Location):
 
 def delete_WS(ID):
     try:
-        datos = obetener_WS(ID)
-        
         conexion = sqlite3.connect(DB_PATH)
         cursor = conexion.cursor()
         cursor.execute("DELETE FROM WS WHERE ID = ?", (ID,))
-        
-        if datos and datos[POS_STATUS] in FUNCIONES_ESTADOS:
-            FUNCIONES_ESTADOS[datos[POS_STATUS]](False)
         conexion.commit()
         conexion.close()
         print(f"[DB SUCCESS] Estación {ID} eliminada correctamente.")
@@ -143,20 +103,20 @@ def actualizar_estado_WS(ID, Status):
 
         cursor.execute("SELECT Status FROM WS WHERE ID = ?", (ID,))
         resultado = cursor.fetchone()
-        old_estado = resultado[0] if resultado else None
-        
-        if old_estado in FUNCIONES_ESTADOS: FUNCIONES_ESTADOS[old_estado](False)
-        FUNCIONES_ESTADOS[Status](True)
+        if not resultado:          # la estación no existe (p. ej. borrada)
+            conexion.close()
+            return
+        old_estado = resultado[0]
 
-        cursor.execute("""UPDATE WS SET Status = ? WHERE ID = ?""", (Status, ID))
+        cursor.execute("UPDATE WS SET Status = ? WHERE ID = ?", (Status, ID))
         conexion.commit()
         conexion.close()
-        
+
         print(f"[DB SUCCESS] Estación {ID} actualizada de '{old_estado}' a '{Status}'.")
         send_kafka("CAMBIO_ESTADO", ID, Status)
     except Exception as e:
         print(f"[DB ERROR] No se pudo resolver el estado: {e}")
-
+        
 ############# KAFKA ############################################################
 KAFKA_BROKER = os.environ.get("KAFKA_BROKER", "localhost:9092")
 
@@ -262,7 +222,7 @@ def handle_client(conn, addr):
                             if(estado_actual == "LEAK"):
                                 print("Arreglo avería")
                                 actualizar_estado_WS(id_estacion, "AVAILABLE")
-                                send_kafka("ARREGLADO_LEAK", id_estacion, "LEAK")
+                                send_kafka("ARREGLADO_LEAK", id_estacion, "AVAILABLE")
                         elif estado_engine == "KO":
                             if(estado_actual != "LEAK"): 
                                 actualizar_estado_WS(id_estacion, "LEAK")
@@ -296,16 +256,13 @@ def handle_client(conn, addr):
                     with LOCK_MONITORES:
                         logs_actuales = list(historial_kafka)
                         historial_kafka.clear()
-                        
-                    resumen = {
-                        "AVAILABLE": AVAILABLE,
-                        "WATERING": WATERING,
-                        "LEAK": LEAK,
-                        "OUT_OF_SERVICE": OUT_OF_SERVICE,
-                        "OFFLINE": OFFLINE,
-                        "estaciones": estaciones,
-                        "logs_kafka": logs_actuales
-                    }
+
+                    conteo = {e: 0 for e in ESTADOS_VALIDOS}
+                    for est in estaciones:
+                        if est[POS_STATUS] in conteo:
+                            conteo[est[POS_STATUS]] += 1
+
+                    resumen = {**conteo, "estaciones": estaciones, "logs_kafka": logs_actuales}
                     send(json.dumps(resumen), conn)
                            
                 else:

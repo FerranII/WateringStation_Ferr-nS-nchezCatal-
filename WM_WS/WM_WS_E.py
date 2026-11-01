@@ -1,3 +1,4 @@
+import os
 import socket
 import sys
 import threading
@@ -22,9 +23,13 @@ def teclado():
     global health_engine
     try:
         while True:
-            if input().strip().lower() == 'k':
+            tecla = input().strip().lower()
+            if tecla == 'k':
                 health_engine = "OK" if health_engine == "KO" else "KO"
                 print(f"[Engine] Health -> {health_engine}")
+            elif tecla == 'q':
+                print("[Engine] Apagando...")
+                os._exit(0)
     except Exception as e:
         print(f"[Engine] Error por teclado: {e}")
             
@@ -66,7 +71,6 @@ def handle_client(conn, addr):
                 continue    
                     
             elif msg == "Health-Check":
-                print("Recibido Health-msg")
                 trama_salud = health_check(msg)
                 if trama_salud:
                     send(trama_salud, conn)
