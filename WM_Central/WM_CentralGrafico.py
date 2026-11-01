@@ -159,7 +159,10 @@ def refrescar_interfaz():
         txt_numLeak.config(text=f"Leak: {datos_sistema.get('LEAK', 0)}")
         txt_numOutOfService.config(text=f"Out of service: {datos_sistema.get('OUT_OF_SERVICE', 0)}")
         txt_numOffline.config(text=f"Offline: {datos_sistema.get('OFFLINE', 0)}")
-    
+
+        logs_nuevos = datos_sistema.get("logs_kafka", [])
+        for log in logs_nuevos:
+            send_kafka(log)
     WATERING_BLINK = not WATERING_BLINK 
     root.after(500, refrescar_interfaz)
     
@@ -170,7 +173,7 @@ def apartado_grafico():
     
     root = tk.Tk()
     root.title("WM_Central - Irrigation Monitoring Panel")
-    root.geometry("900x650")
+    root.geometry("900x500")
     barra_botones = tk.Frame(root, bg=COLOR_BLANCO, bd=2, relief=tk.RAISED)
 
     barra_botones.pack(side=tk.TOP, fill=tk.X, padx=5, pady=5)
@@ -216,44 +219,42 @@ def apartado_grafico():
     
     root.bind("<Button-1>", quitar_seleccion)
     
-    barra_resumen = tk.Frame(root, bg=COLOR_BLANCO, bd=2, relief=tk.RAISED)
-    barra_resumen.pack(side=tk.TOP, fill=tk.X, padx=5, pady=5)
-    
-    txt_resumen1 = tk.Label(barra_resumen, text="SYSTEM SUMMARY", bg=STATUS_COLORS["LEAK"], font=("Arial", 10, "bold"))
-    txt_resumen1.pack(side=tk.TOP, padx=5, pady=5, anchor="w")
-    txt_numAvailable = tk.Label(barra_resumen, text=f"Available: {AVAILABLE}", bg=COLOR_BLANCO, font=("Arial", 8))
-    txt_numAvailable.pack(side=tk.TOP, padx=5, pady=5, anchor="w")
-    txt_numWatering = tk.Label(barra_resumen, text=f"Watering: {WATERING}", bg=COLOR_BLANCO, font=("Arial", 8))
-    txt_numWatering.pack(side=tk.TOP, padx=5, pady=5, anchor="w")
-    txt_numLeak = tk.Label(barra_resumen, text=f"Leak: {LEAK}", bg=COLOR_BLANCO, font=("Arial", 8))
-    txt_numLeak.pack(side=tk.TOP, padx=5, pady=5, anchor="w")
-    txt_numOutOfService = tk.Label(barra_resumen, text=f"Out of service: {OUT_OF_SERVICE}", bg=COLOR_BLANCO, font=("Arial", 8))
-    txt_numOutOfService.pack(side=tk.TOP, padx=5, pady=5, anchor="w")
-    txt_numOffline = tk.Label(barra_resumen, text=f"Offline: {OFFLINE}", bg=COLOR_BLANCO, font=("Arial", 8))
-    txt_numOffline.pack(side=tk.TOP, padx=5, pady=5, anchor="w")
-
-    #Kafka
+    # Marco inferior contenedor para colocar contadores y Kafka lado a lado
     marco_inferior = tk.Frame(root)
     marco_inferior.pack(side=tk.TOP, fill=tk.BOTH, expand=False, padx=5, pady=5)
 
-    # Tu barra de resumen existente se empaqueta dentro de este nuevo marco (side=tk.LEFT)
-    barra_resumen.pack(in_=marco_inferior, side=tk.LEFT, fill=tk.BOTH, expand=False, padx=5, pady=5)
+    # 1. ABAJO A IZQUIERDA: Contadores del sistema (System Summary)
+    barra_resumen = tk.Frame(marco_inferior, bg=COLOR_BLANCO, bd=2, relief=tk.RAISED)
+    barra_resumen.pack(side=tk.LEFT, fill=tk.BOTH, expand=False, padx=5, pady=5)
+    
+    txt_resumen1 = tk.Label(barra_resumen, text="SYSTEM SUMMARY", bg=STATUS_COLORS["LEAK"], fg="white", font=("Arial", 9, "bold"))
+    txt_resumen1.pack(side=tk.TOP, fill=tk.X, padx=2, pady=2)
+    txt_numAvailable = tk.Label(barra_resumen, text=f"Available: {AVAILABLE}", bg=COLOR_BLANCO, font=("Arial", 8), anchor="w")
+    txt_numAvailable.pack(side=tk.TOP, fill=tk.X, padx=5, pady=2)
+    txt_numWatering = tk.Label(barra_resumen, text=f"Watering: {WATERING}", bg=COLOR_BLANCO, font=("Arial", 8), anchor="w")
+    txt_numWatering.pack(side=tk.TOP, fill=tk.X, padx=5, pady=2)
+    txt_numLeak = tk.Label(barra_resumen, text=f"Leak: {LEAK}", bg=COLOR_BLANCO, font=("Arial", 8), anchor="w")
+    txt_numLeak.pack(side=tk.TOP, fill=tk.X, padx=5, pady=2)
+    txt_numOutOfService = tk.Label(barra_resumen, text=f"Out of service: {OUT_OF_SERVICE}", bg=COLOR_BLANCO, font=("Arial", 8), anchor="w")
+    txt_numOutOfService.pack(side=tk.TOP, fill=tk.X, padx=5, pady=2)
+    txt_numOffline = tk.Label(barra_resumen, text=f"Offline: {OFFLINE}", bg=COLOR_BLANCO, font=("Arial", 8), anchor="w")
+    txt_numOffline.pack(side=tk.TOP, fill=tk.X, padx=5, pady=2)
 
-    # NUEVO: Marco, Scrollbar y Caja de Texto (Text widget) para Kafka
+    # 2. ABAJO A DERECHA: Consola de Kafka (más grande y expandible)
     marco_kafka = tk.Frame(marco_inferior, bd=2, relief=tk.RAISED)
     marco_kafka.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=5, pady=5)
-
+    
     tk.Label(marco_kafka, text="KAFKA LIVE EVENTS STREAM", bg="#333333", fg="white", font=("Arial", 9, "bold")).pack(side=tk.TOP, fill=tk.X)
-
+    
     scroll_kafka = ttk.Scrollbar(marco_kafka)
     scroll_kafka.pack(side=tk.RIGHT, fill=tk.Y)
-
-    txt_kafka_log = tk.Text(marco_kafka, height=7, wrap=tk.WORD, yscrollcommand=scroll_kafka.set, bg="#1e1e1e", fg="#00ff2f", font=("Courier", 8))
+    
+    txt_kafka_log = tk.Text(marco_kafka, height=8, wrap=tk.WORD, yscrollcommand=scroll_kafka.set, bg="#1e1e1e", fg="#00ff2f", font=("Courier", 8))
     txt_kafka_log.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
     scroll_kafka.config(command=txt_kafka_log.yview)
-    txt_kafka_log.config(state=tk.DISABLED) # Modo solo lectura
+    txt_kafka_log.config(state=tk.DISABLED) # Solo lectura
 
-    # Mensaje de prueba inicial
+    # Mensaje inicial de prueba en la consola
     send_kafka("[INFO] Conectado al panel gráfico. Esperando eventos...")
     
     refrescar_interfaz()

@@ -18,6 +18,7 @@ POS_ID, POS_LOCATION, POS_VOLUME, POS_STATUS = 0, 1, 2, 3
 
 clientes_monitores = {}
 LOCK_MONITORES = threading.Lock()
+historial_kafka = []
 
 def send(msg, client):
     try:
@@ -176,6 +177,10 @@ def send_kafka(tipo_evento, id_estacion, estado, ubicacion=""):
         }
         producer.send("Watering Station", value=mensaje)
         producer.flush()
+        texto_log = f"[{time.strftime('%H:%M:%S')}] {tipo_evento} -> Estación {id_estacion} ({estado})"
+        with LOCK_MONITORES:
+            historial_kafka.append(texto_log)
+            if len(historial_kafka) > 50: historial_kafka.pop(0)
         print(f"[KAFKA] Evento enviado: {tipo_evento} -> Estación {id_estacion}")
     except Exception as e:
         print(f"[KAFKA ERROR] Fallo al enviar mensaje a Kafka: {e}")
@@ -280,13 +285,18 @@ def handle_client(conn, addr):
                         
                 elif "GET_ALL_WS" in msg:
                     estaciones = obtener_todas_WS()
+                    with LOCK_MONITORES:
+                        logs_actuales = list(historial_kafka)
+                        historial_kafka.clear()
+                        
                     resumen = {
                         "AVAILABLE": AVAILABLE,
                         "WATERING": WATERING,
                         "LEAK": LEAK,
                         "OUT_OF_SERVICE": OUT_OF_SERVICE,
                         "OFFLINE": OFFLINE,
-                        "estaciones": estaciones
+                        "estaciones": estaciones,
+                        "logs_kafka": logs_actuales
                     }
                     send(json.dumps(resumen), conn)
                            
