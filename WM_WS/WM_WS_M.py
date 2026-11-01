@@ -40,10 +40,7 @@ def check_engine(client_engine, client_central):
                 partes = msg_engine.split("#")
                 if "HEALTH_UPDATE" in msg_engine:
                     datos_engine = "#".join(partes[1:])
-                    if "KO" in msg_engine or "LEAK" in msg_engine:
-                        trama_Health_Central = f"STATUS_ENGINE#{ID_ESTACION}#LEAK"
-                    else:
-                        trama_Health_Central = f"STATUS_ENGINE#{ID_ESTACION}#{datos_engine}"
+                    trama_Health_Central = f"STATUS_ENGINE#{ID_ESTACION}#{datos_engine}"
                 
                 if trama_Health_Central: send(trama_Health_Central, client_central)
             time.sleep(1.0)

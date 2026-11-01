@@ -19,6 +19,12 @@ ESTADOS_VALIDOS = ["AVAILABLE", "WATERING", "LEAK", "OUT_OF_SERVICE", "OFFLINE"]
 
 clientes_monitores = {}
 LOCK_MONITORES = threading.Lock()
+LATIDO_TIMEOUT = 5
+
+clientes_operarios = {}
+riegos_activos = {}
+LOCK_ENVIO = threading.Lock()
+
 historial_kafka = []
 
 def send(msg, client):
@@ -191,6 +197,8 @@ def handle_client(conn, addr):
                         print(f"Recibida trama registro - ID: {ID_ESTACION} | Location: {LOCATION}")
                         with LOCK_MONITORES: clientes_monitores[ID_ESTACION] = conn
                         send(f"STATUS#OK#Estacion registrada correctamente", conn)
+                        conn.settimeout(LATIDO_TIMEOUT)
+                        conn.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
                         
                         id_registro = ID_ESTACION
                         insertar_WS(ID_ESTACION, LOCATION)
@@ -271,6 +279,8 @@ def handle_client(conn, addr):
                     
             else:
                 break
+    except socket.timeout:
+        print(f"[LATIDO PERDIDO] {addr} ({id_registro}) lleva más de {LATIDO_TIMEOUT}s sin enviar mensajes")
     except Exception as e:
         print(f"[ERROR CONEXION] {e}")
         
