@@ -70,6 +70,8 @@ def handle_central(client_engine, client_central):
                 if "SOLENOID" in msg_central:
                     print("recibido desde central")
                     send(msg_central, client_engine)
+            else:
+                break
     except Exception as e:
         print(f"[MONITOR] Conexión cerrada con la Central: {e}")
     

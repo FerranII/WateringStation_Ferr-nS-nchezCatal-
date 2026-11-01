@@ -22,14 +22,9 @@ def teclado():
     global health_engine
     try:
         while True:
-            tecla = input()
-            if tecla.strip().lower() == 'k':
-                if(health_engine != "KO"):
-                    health_engine = "KO"
-                    break
-                else:
-                    health_engine = "OK"
-                    break
+            if input().strip().lower() == 'k':
+                health_engine = "OK" if health_engine == "KO" else "KO"
+                print(f"[Engine] Health -> {health_engine}")
     except Exception as e:
         print(f"[Engine] Error por teclado: {e}")
             
@@ -90,6 +85,8 @@ def handle_client(conn, addr):
             
             print(f" He recibido del cliente [{addr}] el mensaje: {msg}")
             conn.send(f"HOLA CLIENTE: He recibido tu mensaje: {msg} ".encode(FORMAT))
+        else:
+            break
     print("ADIOS. TE ESPERO EN OTRA OCASION")
     conn.close()
 

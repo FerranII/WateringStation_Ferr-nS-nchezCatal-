@@ -66,6 +66,14 @@ if os.path.exists("/data"):
 else:
     DB_PATH = "WS_BaseDatos.db"
 
+FUNCIONES_ESTADOS = {
+        "AVAILABLE": estado_AVAILABLE,
+        "WATERING": estado_WATERING,
+        "LEAK": estado_LEAK,
+        "OUT_OF_SERVICE": estado_OUT_OF_SERVICE,
+        "OFFLINE": estado_OFFLINE
+    }
+
 def obetener_WS(ID):
     try:
         conexion = sqlite3.connect(DB_PATH)
@@ -102,9 +110,14 @@ def insertar_WS(ID, Location):
 
 def delete_WS(ID):
     try:
+        datos = obetener_WS(ID)
+        
         conexion = sqlite3.connect(DB_PATH)
         cursor = conexion.cursor()
         cursor.execute("DELETE FROM WS WHERE ID = ?", (ID,))
+        
+        if datos and datos[POS_STATUS] in FUNCIONES_ESTADOS:
+            FUNCIONES_ESTADOS[datos[POS_STATUS]](False)
         conexion.commit()
         conexion.close()
         print(f"[DB SUCCESS] Estación {ID} eliminada correctamente.")
@@ -124,14 +137,6 @@ def actualizar_volumen_WS(ID, volume):
         
 def actualizar_estado_WS(ID, Status):
     if Status not in ESTADOS_VALIDOS: return
-    
-    funciones_estados = {
-        "AVAILABLE": estado_AVAILABLE,
-        "WATERING": estado_WATERING,
-        "LEAK": estado_LEAK,
-        "OUT_OF_SERVICE": estado_OUT_OF_SERVICE,
-        "OFFLINE": estado_OFFLINE
-    }
     try:
         conexion = sqlite3.connect(DB_PATH)
         cursor = conexion.cursor()
@@ -140,8 +145,8 @@ def actualizar_estado_WS(ID, Status):
         resultado = cursor.fetchone()
         old_estado = resultado[0] if resultado else None
         
-        if old_estado in funciones_estados: funciones_estados[old_estado](False)
-        funciones_estados[Status](True)
+        if old_estado in FUNCIONES_ESTADOS: FUNCIONES_ESTADOS[old_estado](False)
+        FUNCIONES_ESTADOS[Status](True)
 
         cursor.execute("""UPDATE WS SET Status = ? WHERE ID = ?""", (Status, ID))
         conexion.commit()
@@ -192,7 +197,7 @@ def start():
     print(f"[LISTENING] Servidor backend a la escucha en {SERVER}:{PORT}")
     while True:
         conn, addr = server.accept()
-        if (NUMERO_CLIENTES <= MAX_CONEXIONES):
+        if (NUMERO_CLIENTES < MAX_CONEXIONES):
             NUMERO_CLIENTES += 1
             thread = threading.Thread(target=handle_client, args=(conn, addr))
             thread.daemon = True
@@ -205,9 +210,10 @@ def start():
             
 ############# RESPONDER CLIENTES ###############################
 def handle_client(conn, addr):
-    print(f"[NUEVA CONEXION] {addr} connected.")
+    global NUMERO_CLIENTES
     connected = True
     id_registro = None
+    print(f"[NUEVA CONEXION] {addr} connected.")
     try:
         while connected:
             msg_length = conn.recv(HEADER).decode(FORMAT)
@@ -261,10 +267,11 @@ def handle_client(conn, addr):
                             if(estado_actual != "LEAK"): 
                                 actualizar_estado_WS(id_estacion, "LEAK")
                                 send_kafka("ALERTA_LEAK", id_estacion, "LEAK")
-                    else:
+                    elif len(partes) >= 2:
+                        id_estacion = partes[1]
                         datos_ws = obetener_WS(id_estacion)
                         estado_actual = datos_ws[POS_STATUS] if datos_ws else "OFFLINE"
-                        if(estado_actual != "LEAK"): 
+                        if estado_actual != "LEAK":
                             actualizar_estado_WS(id_estacion, "LEAK")
                             send_kafka("ALERTA_LEAK", id_estacion, "LEAK")
                 elif "SOLENOID" in msg or "ACTIVATE" in msg or "DELETE" in msg:
@@ -305,16 +312,22 @@ def handle_client(conn, addr):
                     print(f"He recibido del cliente [{addr}] el mensaje: {msg}")
                     send(f"HOLA CLIENTE: He recibido tu mensaje: {msg} ", conn)
                     
+            else:
+                break
     except Exception as e:
         print(f"[ERROR CONEXION] {e}")
         
     finally:
-        if id_registro:
+        with LOCK_MONITORES:
+            NUMERO_CLIENTES -= 1
+            es_la_actual = bool(id_registro) and clientes_monitores.get(id_registro) is conn
+            if es_la_actual:
+                del clientes_monitores[id_registro]
+
+        if es_la_actual:
             print(f"La estación {id_registro} se ha desconectado")
             actualizar_estado_WS(id_registro, "OFFLINE")
             send_kafka("DESCONEXION_MONITOR", id_registro, "OFFLINE")
-            with LOCK_MONITORES:
-                if id_registro in clientes_monitores: del clientes_monitores[id_registro]
             
     conn.close()
     
