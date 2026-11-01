@@ -5,7 +5,6 @@ import time
 import sqlite3
 import os
 import shutil
-
 from kafka import KafkaConsumer, KafkaProducer
 
 HEADER = 64
@@ -59,7 +58,7 @@ def estado_OFFLINE(i):
     if(i): OFFLINE += 1
     else: OFFLINE = max(0, OFFLINE - 1)
           
-############# BASE DATOS ###############################
+############# BASE DE DATOS ###############################
 if os.path.exists("/data"):
     DB_PATH = "/data/WS_BaseDatos.db"
     if not os.path.exists(DB_PATH) and os.path.exists("WS_BaseDatos.db"): shutil.copy("WS_BaseDatos.db", DB_PATH)
@@ -108,6 +107,7 @@ def delete_WS(ID):
         conexion.commit()
         conexion.close()
         print(f"[DB SUCCESS] Estación {ID} eliminada correctamente.")
+        send_kafka("ELIMINACION_ESTACION", ID)
     except Exception as e:
         print(f"[DB ERROR]: {e}")
 
@@ -147,9 +147,38 @@ def actualizar_estado_WS(ID, Status):
         conexion.close()
         
         print(f"[DB SUCCESS] Estación {ID} actualizada de '{old_estado}' a '{Status}'.")
+        send_kafka("CAMBIO_ESTADO", ID, Status)
     except Exception as e:
         print(f"[DB ERROR] No se pudo resolver el estado: {e}")
 
+############# KAFKA ############################################################
+KAFKA_BROKER = os.environ.get("KAFKA_BROKER", "localhost:9092")
+
+try:
+    producer = KafkaProducer(
+        bootstrap_servers=[KAFKA_BROKER],
+        value_serializer=lambda v: json.dumps(v).encode('utf-8')
+    )
+    print("Productor conectado")
+except Exception as e:
+    print(f"No se pudo conectar a Kafka: {e}")
+    producer = None
+    
+def send_kafka(tipo_evento, id_estacion, estado, ubicacion=""):
+    if not producer: return
+    try:
+        mensaje = {
+            "evento": tipo_evento,
+            "id_estacion": id_estacion,
+            "estado": estado,
+            "ubicacion": ubicacion,
+            "timestamp": time.time()
+        }
+        producer.send("Watering Station", value=mensaje)
+        producer.flush()
+        print(f"[KAFKA] Evento enviado: {tipo_evento} -> Estación {id_estacion}")
+    except Exception as e:
+        print(f"[KAFKA ERROR] Fallo al enviar mensaje a Kafka: {e}")
 ############### ATENDER CONEXIONES #######################
 def start():
     global NUMERO_CLIENTES
@@ -173,8 +202,8 @@ def handle_client(conn, addr):
     print(f"[NUEVA CONEXION] {addr} connected.")
     connected = True
     id_registro = None
-    while connected:
-        try:
+    try:
+        while connected:
             msg_length = conn.recv(HEADER).decode(FORMAT)
             if msg_length:
                 msg_length = int(msg_length)
@@ -194,6 +223,7 @@ def handle_client(conn, addr):
                         id_registro = ID_ESTACION
                         insertar_WS(ID_ESTACION, LOCATION)
                         actualizar_estado_WS(ID_ESTACION, "AVAILABLE")
+                        send_kafka("REGISTRO_ESTACION", ID_ESTACION, "AVAILABLE", LOCATION)
                     else:
                         send(f"STATUS#ERROR#Trama incorrecta", conn)       
                 elif "REGISTRO_FO" in msg:
@@ -220,12 +250,17 @@ def handle_client(conn, addr):
                             if(estado_actual == "LEAK"):
                                 print("Arreglo avería")
                                 actualizar_estado_WS(id_estacion, "AVAILABLE")
+                                send_kafka("ARREGLADO_LEAK", id_estacion, "LEAK")
                         elif estado_engine == "KO":
-                            if(estado_actual != "LEAK"): actualizar_estado_WS(id_estacion, "LEAK")
+                            if(estado_actual != "LEAK"): 
+                                actualizar_estado_WS(id_estacion, "LEAK")
+                                send_kafka("ALERTA_LEAK", id_estacion, "LEAK")
                     else:
                         datos_ws = obetener_WS(id_estacion)
                         estado_actual = datos_ws[POS_STATUS] if datos_ws else "OFFLINE"
-                        if(estado_actual != "LEAK"): actualizar_estado_WS(id_estacion, "LEAK")
+                        if(estado_actual != "LEAK"): 
+                            actualizar_estado_WS(id_estacion, "LEAK")
+                            send_kafka("ALERTA_LEAK", id_estacion, "LEAK")
                 elif "SOLENOID" in msg or "ACTIVATE" in msg or "DELETE" in msg:
                     print(f"[COMANDO UI] Recibido desde panel local: {msg}")
                     partes = msg.split('#')
@@ -258,17 +293,18 @@ def handle_client(conn, addr):
                 else:
                     print(f"He recibido del cliente [{addr}] el mensaje: {msg}")
                     send(f"HOLA CLIENTE: He recibido tu mensaje: {msg} ", conn)
-        except Exception as e:
-            print(f"[ERROR CONEXION] {e}")
-            break
-        finally:
-            if id_registro:
-                print(f"La estación {id_registro} se ha desconectado")
-                actualizar_estado_WS(id_registro, "OFFLINE")
-                with LOCK_MONITORES:
-                    if id_registro in clientes_monitores: del clientes_monitores[id_registro]
+                    
+    except Exception as e:
+        print(f"[ERROR CONEXION] {e}")
+        
+    finally:
+        if id_registro:
+            print(f"La estación {id_registro} se ha desconectado")
+            actualizar_estado_WS(id_registro, "OFFLINE")
+            send_kafka("DESCONEXION_MONITOR", id_registro, "OFFLINE")
+            with LOCK_MONITORES:
+                if id_registro in clientes_monitores: del clientes_monitores[id_registro]
             
-    print("ADIOS. TE ESPERO EN OTRA OCASION")
     conn.close()
     
 #################### START IRRIGATION #######################

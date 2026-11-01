@@ -67,7 +67,7 @@ def recv_msg(sock):
             break
         data += packet
     return data.decode(FORMAT)
-
+##### BD #######################
 def pedir_todas_WS():
     if not client_socket: return None
     try:
@@ -86,6 +86,17 @@ def WS_seleccionada():
         return valores[POS_ID]
     return None
 
+##### Kafka #######################
+txt_kafka_log = None
+
+def send_kafka(mensaje):
+    if txt_kafka_log:
+        txt_kafka_log.config(state=tk.NORMAL)
+        txt_kafka_log.insert(tk.END, mensaje + "\n")
+        txt_kafka_log.see(tk.END)
+        txt_kafka_log.config(state=tk.DISABLED)
+
+##### UI Interfaz #######################
 def quitar_seleccion(event):
     if event.widget != tabla and event.widget not in (btn_StartWatering, btn_BLOCKWS, btn_ACTIVATEWS, btn_DELETEWS):
         tabla.selection_remove(tabla.selection())
@@ -159,7 +170,7 @@ def apartado_grafico():
     
     root = tk.Tk()
     root.title("WM_Central - Irrigation Monitoring Panel")
-    root.geometry("800x500")
+    root.geometry("900x650")
     barra_botones = tk.Frame(root, bg=COLOR_BLANCO, bd=2, relief=tk.RAISED)
 
     barra_botones.pack(side=tk.TOP, fill=tk.X, padx=5, pady=5)
@@ -221,6 +232,30 @@ def apartado_grafico():
     txt_numOffline = tk.Label(barra_resumen, text=f"Offline: {OFFLINE}", bg=COLOR_BLANCO, font=("Arial", 8))
     txt_numOffline.pack(side=tk.TOP, padx=5, pady=5, anchor="w")
 
+    #Kafka
+    marco_inferior = tk.Frame(root)
+    marco_inferior.pack(side=tk.TOP, fill=tk.BOTH, expand=False, padx=5, pady=5)
+
+    # Tu barra de resumen existente se empaqueta dentro de este nuevo marco (side=tk.LEFT)
+    barra_resumen.pack(in_=marco_inferior, side=tk.LEFT, fill=tk.BOTH, expand=False, padx=5, pady=5)
+
+    # NUEVO: Marco, Scrollbar y Caja de Texto (Text widget) para Kafka
+    marco_kafka = tk.Frame(marco_inferior, bd=2, relief=tk.RAISED)
+    marco_kafka.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=5, pady=5)
+
+    tk.Label(marco_kafka, text="KAFKA LIVE EVENTS STREAM", bg="#333333", fg="white", font=("Arial", 9, "bold")).pack(side=tk.TOP, fill=tk.X)
+
+    scroll_kafka = ttk.Scrollbar(marco_kafka)
+    scroll_kafka.pack(side=tk.RIGHT, fill=tk.Y)
+
+    txt_kafka_log = tk.Text(marco_kafka, height=7, wrap=tk.WORD, yscrollcommand=scroll_kafka.set, bg="#1e1e1e", fg="#00ff2f", font=("Courier", 8))
+    txt_kafka_log.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+    scroll_kafka.config(command=txt_kafka_log.yview)
+    txt_kafka_log.config(state=tk.DISABLED) # Modo solo lectura
+
+    # Mensaje de prueba inicial
+    send_kafka("[INFO] Conectado al panel gráfico. Esperando eventos...")
+    
     refrescar_interfaz()
     root.mainloop()
 
