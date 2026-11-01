@@ -21,10 +21,6 @@ clientes_monitores = {}
 LOCK_MONITORES = threading.Lock()
 LATIDO_TIMEOUT = 5
 
-clientes_operarios = {}
-riegos_activos = {}
-LOCK_ENVIO = threading.Lock()
-
 historial_kafka = []
 
 def send(msg, client):
@@ -272,6 +268,9 @@ def handle_client(conn, addr):
 
                     resumen = {**conteo, "estaciones": estaciones, "logs_kafka": logs_actuales}
                     send(json.dumps(resumen), conn)
+                    
+                elif msg.startswith("LIST_WS"):
+                    send(json.dumps({"estaciones": obtener_todas_WS()}), conn)
                            
                 else:
                     print(f"He recibido del cliente [{addr}] el mensaje: {msg}")

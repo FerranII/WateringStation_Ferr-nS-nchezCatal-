@@ -11,8 +11,8 @@ HEADER = 64
 FORMAT = 'utf-8'
 FIN = "FIN"
 COLOR_BLANCO = "#ffffff"
-REINTENTO_S = 3          # segundos entre reintentos de conexion con Central
-REFRESCO_MS = 1000       # cada cuanto se pide la lista de WS
+REINTENTO_S = 3
+REFRESCO_MS = 1000
 
 POS_ID, POS_LOCATION, POS_VOLUME, POS_STATUS = 0, 1, 2, 3
 STATUS_COLORS = {
@@ -23,16 +23,13 @@ STATUS_COLORS = {
     "OFFLINE": "#9ca0a3"
 }
 
-# Estado de red compartido entre hilos
 sock = None
 conectado = False
 lock_envio = threading.Lock()
-cola = queue.Queue()     # el hilo de red deja aqui lo que debe pintar la GUI
-
+cola = queue.Queue()
 
 ########## RED ##########
 def recv_exact(s, n):
-    """Lee exactamente n bytes o devuelve None si se cierra la conexion."""
     data = b""
     while len(data) < n:
         paquete = s.recv(n - len(data))
@@ -51,7 +48,6 @@ def recv_msg(s):
 
 
 def send(msg):
-    """Envia una trama. Devuelve False si no hay conexion o falla."""
     global conectado
     if not conectado or sock is None:
         return False
@@ -70,7 +66,6 @@ def send(msg):
 
 
 def conectar():
-    """Conecta con Central y se registra. Devuelve (ok, mensaje)."""
     global sock, conectado
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -94,16 +89,14 @@ def conectar():
 
 
 def hilo_red():
-    """Mantiene la conexion (reconecta solo) y reparte los mensajes recibidos."""
     global conectado
     while True:
         if not conectado:
-            cola.put(("estado", "Imposible conectar con WM_Central. Reintentando...", "red"))
             ok, info = conectar()
             if ok:
-                cola.put(("estado", f"Conectado a Central ({IP_CENTRAL}:{PORT_CENTRAL})", "green"))
-                cola.put(("log", f"[CENTRAL] {info}"))
+                cola.put(("estado", "", "black"))
             else:
+                cola.put(("estado", "Imposible conectar con WM_Central. Reintentando...", "red"))
                 time.sleep(REINTENTO_S)
             continue
         try:
@@ -123,7 +116,9 @@ def hilo_red():
             try:
                 cola.put(("tabla", json.loads(msg)))
             except json.JSONDecodeError:
-                cola.put(("log", f"[CENTRAL] {msg}"))
+                pass
+        elif msg.startswith("HOLA CLIENTE"):
+            pass
         else:
             cola.put(("log", f"[CENTRAL] {msg}"))
 
@@ -207,7 +202,7 @@ def apartado_grafico():
     barra.pack(side=tk.TOP, fill=tk.X, padx=5, pady=5)
     tk.Button(barra, text="Request watering", bg=STATUS_COLORS["AVAILABLE"],
               command=pedir_riego).pack(side=tk.LEFT, padx=5, pady=5)
-    lbl_estado = tk.Label(barra, text="Conectando...", bg=COLOR_BLANCO, fg="gray")
+    lbl_estado = tk.Label(barra, text="", bg=COLOR_BLANCO, fg="black")
     lbl_estado.pack(side=tk.RIGHT, padx=10)
 
     marco = tk.Frame(root)
